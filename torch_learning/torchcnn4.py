@@ -16,7 +16,7 @@ img_data = torchvision.datasets.ImageFolder(path,
                                                 transforms.Scale(32),
                                                 transforms.CenterCrop(28),
                                                 transforms.ToTensor(),
-                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                                                 ])
                                             )
 
@@ -47,7 +47,6 @@ def imshow(img):
     img = torch.clamp(img,0,1)
     plt.imshow(img)
    
-    
 dataiter = iter(img_loader)
 images, labels = dataiter.next()
 
@@ -88,9 +87,9 @@ class CNNAE(nn.Module):
         )
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        encode = self.encoder(x)
+        decode = self.decoder(encode)
+        return encode, decode
 
 #################################################################
 def matplotlib_imshow(img, one_channel=False):
@@ -103,7 +102,7 @@ def matplotlib_imshow(img, one_channel=False):
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
 def to_img(x):
-    x = 0.5 * (x + 1)
+    #x = 0.5 * (x + 1)
     x = x.clamp(0, 1)
     x = x.view(x.size(0), 3, 28, 28)
     return x
@@ -117,14 +116,14 @@ optimizer =  torch.optim.Adam(model.parameters(), lr=0.001,weight_decay=1e-5)
 
 
 # number of epochs to train the model
-n_epochs =510
+n_epochs =1010
 writer = SummaryWriter('runs/CNNAE_result')
 #tensorboard --logdir=runs
 
 for epoch in range(n_epochs):
     for i, (img, labels) in enumerate(img_loader):
     # ===================forward=====================
-        output = model(img)
+        _ , output = model(img)
         loss = criterion(output, img)
     # ===================backward====================
         optimizer.zero_grad()
@@ -137,7 +136,9 @@ for epoch in range(n_epochs):
           .format(epoch+1, n_epochs, loss.item()))
     if epoch % 10 == 0:
         pic = to_img(output.data)
-        save_image(pic, './data/image_{}.png'.format(epoch))
+        save_image(pic, './data_tanh/image_{}.png'.format(epoch))
+
+        #data_relu  data_tanh   data_sigmoid
 
 torch.save(model.state_dict(), './conv_autoencoder.pth')
  
