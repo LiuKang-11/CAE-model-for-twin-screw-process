@@ -20,9 +20,8 @@ img_data = torchvision.datasets.ImageFolder(path,
                                                 ])
                                             )
 
+print(img_data.imgs)
 #print(len(img_data))
-
-
 #print(len(data_loader))
 print(img_data.class_to_idx)
 
@@ -65,26 +64,27 @@ class CNNAE(nn.Module):
         super(CNNAE, self).__init__()
         self.conv1 = nn.Sequential(
             nn.Conv2d(3, 16, 3, stride=3, padding=1),  #(16,10,10)
-            nn.Tanh(),
             nn.BatchNorm2d(16),
+            nn.Tanh(),
             nn.MaxPool2d(2, stride=2)
         )  # 16,5,5
         self.conv2 = nn.Sequential(
             nn.Conv2d(16, 8, 3, stride=2, padding=1),  # 
-            nn.Tanh(),
             nn.BatchNorm2d(8),
+            nn.Tanh(),
             nn.MaxPool2d(2, stride=1)  #(8,2,2)
         )
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(8, 16, 3, stride=2),  # 
-            nn.Tanh(),
             nn.BatchNorm2d(16),
+            nn.Tanh(),
             nn.ConvTranspose2d(16, 8, 5, stride=3, padding=1),  # 
-            nn.Tanh(),
             nn.BatchNorm2d(8),
-            nn.ConvTranspose2d(8, 3, 2, stride=2, padding=1),  # 
             nn.Tanh(),
-            nn.BatchNorm2d(3)
+            nn.ConvTranspose2d(8, 3, 2, stride=2, padding=1),  # 
+            nn.BatchNorm2d(3),
+            nn.Tanh()
+            
           
         )
 
@@ -129,11 +129,11 @@ print(len(img_loader))
 model = CNNAE()
 #print(model)
 criterion = nn.MSELoss()
-optimizer =  torch.optim.Adam(model.parameters(), lr=0.001,weight_decay=1e-5)
+optimizer =  torch.optim.Adam(model.parameters(), lr=0.003,weight_decay=1e-5)
 
 
 # number of epochs to train the model
-n_epochs =1010
+n_epochs =101
 writer = SummaryWriter('runs/CNNAE_result')
 #tensorboard --logdir=runs
 
@@ -160,9 +160,11 @@ for epoch in range(n_epochs):
         save_image(pic3,'./encode_tanh/image_{}.png'.format(epoch))
 
         #data_relu  data_tanh   data_sigmoid
+print(labels)
+print(encode.view(-1,32))
+#torch.save(model.state_dict(), './conv_autoencoder.pth')
 
-torch.save(model.state_dict(), './conv_autoencoder.pth')
- 
+
 img_grid = torchvision.utils.make_grid(images)
 # show images
 matplotlib_imshow(img_grid, one_channel=False)
@@ -173,5 +175,3 @@ writer.add_image('Origin_img', img_grid)
 #tensorboard --logdir=runs
 writer.add_graph(model, images)
 writer.close()
-
-    
