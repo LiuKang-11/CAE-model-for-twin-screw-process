@@ -138,13 +138,16 @@ class Extrader(nn.Module):
         self.output_size = output_size
         # 压缩
         self.model = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
+            nn.Linear(input_size, 64),
+            nn.Dropout(0.5),
             nn.Tanh(),
-#             nn.Linear(64, 16),
+            nn.Linear(64, 64),
+            nn.Dropout(0.5),
             nn.Tanh(),
-#             nn.Linear(64, 16),
-#             nn.Tanh(),
-            nn.Linear(hidden_size, output_size),   # 压缩成3个特征, 进行 3D 图像可视化
+            nn.Linear(64, 64),
+            nn.Dropout(0.5),
+            nn.Tanh(),        
+            nn.Linear(hidden_size, output_size)   # 压缩成3个特征, 进行 3D 图像可视化
         )
         
     def forward(self, x):
@@ -166,9 +169,11 @@ class AutoEncoder(nn.Module):
 #             nn.Tanh(),
 #             nn.Linear(15, 15),
 #             nn.Tanh(),
-            nn.Linear(hidden_size, 1),   # 压缩成3个特征, 进行 3D 图像可视化
+#            nn.Linear(hidden_size, 1),   # 压缩成3个特征, 进行 3D 图像可视化
 #             nn.Tanh(),
         )
+        self.encoder2 = nn.Linear(hidden_size, 1)
+
         # 解压
         self.decoder = nn.Sequential(
             nn.Linear(1, hidden_size),
@@ -182,9 +187,10 @@ class AutoEncoder(nn.Module):
         )
 
     def forward(self, x):
-        encoded = self.encoder(x)
+        feature = self.encoder(x)
+        encoded = self.encoder2(feature)
         decoded = self.decoder(encoded)
-        return encoded, decoded
+        return feature, encoded, decoded
 
 #Part9
 class IntegratedModel(nn.Module):
@@ -194,21 +200,21 @@ class IntegratedModel(nn.Module):
         self.extrater = Extrader(5,64,1)
         
     def forward(self, quality, quantity):
-        encoded_1,decoded_1 = self.AE(quality[0].unsqueeze(0))
+        feature1,encoded_1,decoded_1 = self.AE(quality[0].unsqueeze(0))
 #         print(encoded_1.shape)
-        encoded_2,decoded_2 = self.AE(quality[1].unsqueeze(0))
-        encoded_3,decoded_3 = self.AE(quality[2].unsqueeze(0))
+        feature2,encoded_2,decoded_2 = self.AE(quality[1].unsqueeze(0))
+        feature3,encoded_3,decoded_3 = self.AE(quality[2].unsqueeze(0))
 #         print(quantity[0,0].shape)
         input_value = torch.cat((encoded_1, encoded_2,
                                  encoded_3,quantity),1)
 #         print(input_value.shape)
         out = self.extrater(input_value)
-        return decoded_1,decoded_2,decoded_3,out
+        return feature1,feature2,feature3,decoded_1,decoded_2,decoded_3,out
 
 #Part10
 ### training the integrated model
 my_model = IntegratedModel()
-EPOCH = 100
+EPOCH = 201
 BATCH_SIZE = 16
 LR = 0.002
 optimizer = torch.optim.Adam(my_model.parameters(), lr=LR)
@@ -219,12 +225,15 @@ iteration = 0
 AE_loss = []
 MSE_loss = []
 embeddingvalue = []
-writer = SummaryWriter('runs/NN_result')
-
+writer = SummaryWriter('runs/onehot_result')
+  
 #RTD
 for epoch in range(EPOCH):
 #     total_loss1 = 0
-#     total_loss2 = 0
+    total_loss2 = 0
+    tensor_list = [] #存放数据tensor
+    meta_data = [] #存放标签
+    features = torch.zeros(0)
     for i in range(len(train_yR)):
         ### train AE
         iteration += 1
@@ -234,7 +243,7 @@ for epoch in range(EPOCH):
         en_input3 = torch.FloatTensor(text_to_onehot(train_three[i])).unsqueeze(0)
         x = torch.cat((en_input1,en_input2,en_input3),0)
         y = torch.FloatTensor(quantity[i]).unsqueeze(0)
-        d1,d2,d3,outR = my_model(x,y)
+        f1,f2,f3,d1,d2,d3,outR = my_model(x,y)
         
         ae_loss = loss_func(d1, en_input1) + loss_func(d2, en_input2) + loss_func(d3, en_input3)
         optimizer.zero_grad()               # clear gradients for this training step
@@ -251,15 +260,17 @@ for epoch in range(EPOCH):
         en_input2 = torch.FloatTensor(text_to_onehot(train_two[i])).unsqueeze(0)
         en_input3 = torch.FloatTensor(text_to_onehot(train_three[i])).unsqueeze(0)
         x = torch.cat((en_input1,en_input2,en_input3),0)
+        #print (x.shape)
         y = torch.FloatTensor(quantity[i]).unsqueeze(0)
-        d1,d2,d3,outR = my_model(x,y)
+        #print (y.shape)
+        f1,f2,f3,d1,d2,d3,outR = my_model(x,y)
         
         mse_loss = loss_func(outR, targetR)
         optimizer.zero_grad()               # clear gradients for this training step
         mse_loss.backward()                     # backpropagation, compute gradients
         optimizer.step()                    # apply gradients
-#         total_loss2 += loss.item()
-#         loss2 = total_loss2/2800
+        total_loss2 += mse_loss.item()
+        loss2 = total_loss2/2800
 #         print('epoch',epoch,loss.item())
         if (iteration % 50 == 0):
             MSE_loss.append(mse_loss.item())
@@ -267,16 +278,30 @@ for epoch in range(EPOCH):
         if(iteration % 50 == 0):
             for item in text_onehot_list.keys():
                 input_ = torch.FloatTensor(text_onehot_list[item]).unsqueeze(0)
-                e1,d1 = my_model.AE(input_)
-                embeddingvalue.append(e1)
-                
+#                e1,d1 = my_model.AE(input_)
+#                embeddingvalue.append(e1)
+        
+        features = torch.cat((features, f1))
+        features = torch.cat((features, f2))
+        features = torch.cat((features, f3))
+        label1=[str(train_one[i])]
+        label2=[str(train_two[i])]
+        label3=[str(train_three[i])]
+        meta_data.append(label1)
+        meta_data.append(label2)
+        meta_data.append(label3)
+    features = features.view(-1, 15)
+    #print(features.shape)
+    #print(meta_data)
+    #print(type(features))
+    writer.add_embedding(features, metadata=meta_data, global_step=epoch)
     writer.add_scalar('AE_loss', ae_loss, epoch)
-    writer.add_scalar('MSE_loss', mse_loss, epoch)
+    writer.add_scalar('MSE_loss', loss2, epoch)
     if(epoch%10 == 0):
         print('epoch [{}/{}], ae_loss:{:.4f}'
-          .format(epoch+1, EPOCH, ae_loss.item()))
+          .format(epoch, EPOCH, ae_loss.item()))
         print('epoch [{}/{}], mse_loss:{:.4f}'
-          .format(epoch+1, EPOCH, mse_loss.item()))
+          .format(epoch, EPOCH, loss2))
 
 
 
