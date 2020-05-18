@@ -16,7 +16,7 @@ img_data = torchvision.datasets.ImageFolder(path,
                                                 transforms.Scale(32),
                                                 transforms.CenterCrop(28),
                                                 transforms.ToTensor(),
-                                                #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                                                 ])
                                             )
 print(img_data.imgs)
@@ -114,10 +114,13 @@ def to_img3(x):
 
 print(len(img_loader))
 model2 = CNNAE()
-model2.load_state_dict(torch.load('D:/PYTHON/  CNNAE_tanh.pth'))
+model2.load_state_dict(torch.load('D:/PYTHON/  CNNAE_tanh2.pth'))
+criterion = nn.MSELoss()
 
 for i, (img, labels) in enumerate(img_loader):
     feature, encode , output = model2(img)
+    loss = criterion(output, img)
 
+print(loss)
 pic = to_img(output.data)
 save_image(pic, './img_test/image_{}.png'.format(2))
