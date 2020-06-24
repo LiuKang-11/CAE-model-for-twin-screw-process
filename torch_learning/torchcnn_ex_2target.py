@@ -130,7 +130,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.003,weight_decay=1e-5)
 
 # number of epochs to train the model
 n_epochs = 501
-writer = SummaryWriter('ex_test_temp_std2/cnn_result')
+writer = SummaryWriter('ex_2target/cnn_result')
 #tensorboard --logdir=runs
 #http://localhost:6006/
 
@@ -173,7 +173,7 @@ for item in classes:
 
 print(encode_list)
 
-#torch.save(model.state_dict(), './  CNNstd.pth')
+#torch.save(model.state_dict(), './  CNNAE_tanh_2target.pth')
 
 
 img_grid = torchvision.utils.make_grid(images)
@@ -263,10 +263,10 @@ train_three = np.array(train.three.values)
 '''
 test_yR = train_y[2500:2812,0:1]
 test_yT = train_y[2500:2812,1:2]
-std_test_yT=min_max_normalize(test_yT)
-std2_test_yT= normalize(test_yT)
-std2_test_yR= normalize(test_yR)
 
+std2_test_yR=normalize(test_yR)
+std2_test_yT=normalize(test_yT)
+std2_test_2target= np.concatenate((std2_test_yR,std2_test_yT),axis = 1)
 #print(len(test_y),test_y.shape)
 # (340,2)
 
@@ -282,9 +282,11 @@ test_three = train_three[2500:2812]
 '''
 train_yR = train_y[0:2000,0:1]
 train_yT = train_y[0:2000,1:2]
-std_train_yT=min_max_normalize(train_yT)
-std2_train_yT=normalize(train_yT)
 std2_train_yR=normalize(train_yR)
+std2_train_yT=normalize(train_yT)
+std2_train_2target= np.concatenate((std2_train_yR,std2_train_yT),axis = 1)
+
+
 
 #print(len(train_y))
 #2800
@@ -297,9 +299,10 @@ train_three1 = train_three[0:2000]
 #####Validation
 val_yR = train_y[2000:2500,0:1]
 val_yT = train_y[2000:2500,1:2]
-std_val_yT=min_max_normalize(val_yT)
-std2_val_yT=normalize(val_yT)
+
 std2_val_yR=normalize(val_yR)
+std2_val_yT=normalize(val_yT)
+std2_val_2target= np.concatenate((std2_val_yR,std2_val_yT),axis = 1)
 
 #print(len(train_y))
 #2800
@@ -391,7 +394,7 @@ class IntegratedModel(nn.Module):
     def __init__(self):
         super(IntegratedModel, self).__init__()
         self.AE = AutoEncoder(16,8,16)
-        self.extrater = Extrader(5,64,1)
+        self.extrater = Extrader(5,64,2)
         
         
     def forward(self, quality, quantity):
@@ -420,7 +423,7 @@ iteration = 0
 AE_loss = []
 MSE_loss = []
 #embeddingvalue = []
-writer = SummaryWriter('ex_test_rtd_std2/NN_result')
+writer = SummaryWriter('ex_2target_std2/NN_result')
 
 
 ####Training Part
@@ -435,7 +438,7 @@ for epoch in range(EPOCH):
         
         ### train AE
         iteration += 1
-        targetR = torch.FloatTensor(std2_train_yR[i]).view(-1,1).detach()
+        targetR = torch.FloatTensor(std2_train_2target[i]).view(1,-1).detach()
         en_input1 = torch.FloatTensor(text_to_encode(train_one1[i])).unsqueeze(0)
         en_input2 = torch.FloatTensor(text_to_encode(train_two1[i])).unsqueeze(0)
         en_input3 = torch.FloatTensor(text_to_encode(train_three1[i])).unsqueeze(0)
@@ -453,7 +456,7 @@ for epoch in range(EPOCH):
             AE_loss.append(loss.item())
         
         ### train extrater
-        targetR = torch.FloatTensor(std2_train_yR[i]).view(-1,1).detach()
+        targetR = torch.FloatTensor(std2_train_2target[i]).view(1,-1).detach()
         en_input1 = torch.FloatTensor(text_to_encode(train_one[i])).unsqueeze(0)
         en_input2 = torch.FloatTensor(text_to_encode(train_two[i])).unsqueeze(0)
         en_input3 = torch.FloatTensor(text_to_encode(train_three[i])).unsqueeze(0)
@@ -471,8 +474,8 @@ for epoch in range(EPOCH):
         total_loss2 += loss.item()
         loss2 = total_loss2/2000
 
-        if epoch == 200:
-            writer.add_scalar('predict RTD', outR, i)
+        #if epoch == 200:
+            #writer.add_scalar('predict TEMP', outR, i)
 
 #         print('epoch',epoch,loss.item())
         if (iteration % 50 == 0):
@@ -509,7 +512,7 @@ for epoch in range(EPOCH):
         
         ### train AE
         iteration += 1
-        targetR = torch.FloatTensor(std2_val_yR[i]).view(-1,1).detach()
+        targetR = torch.FloatTensor(std2_val_2target[i]).view(1,-1).detach()
         en_input1 = torch.FloatTensor(text_to_encode(val_one[i])).unsqueeze(0)
         en_input2 = torch.FloatTensor(text_to_encode(val_two[i])).unsqueeze(0)
         en_input3 = torch.FloatTensor(text_to_encode(val_three[i])).unsqueeze(0)
@@ -522,11 +525,11 @@ for epoch in range(EPOCH):
         loss.backward()                     # backpropagation, compute gradients
         optimizer.step()                    # apply gradients
         total_loss1 += loss.item()
-        loss1 = total_loss1/499
+        loss1 = total_loss1/500
 
         
         ### train extrater
-        targetR = torch.FloatTensor(std2_val_yR[i]).view(-1,1).detach()
+        targetR = torch.FloatTensor(std2_val_2target[i]).view(1,-1).detach()
         en_input1 = torch.FloatTensor(text_to_encode(val_one[i])).unsqueeze(0)
         en_input2 = torch.FloatTensor(text_to_encode(val_two[i])).unsqueeze(0)
         en_input3 = torch.FloatTensor(text_to_encode(val_three[i])).unsqueeze(0)
@@ -542,7 +545,7 @@ for epoch in range(EPOCH):
         loss.backward()                     # backpropagation, compute gradients
         optimizer.step()                    # apply gradients
         total_loss2 += loss.item()
-        loss2 = total_loss2/499
+        loss2 = total_loss2/500
 
         
         features = torch.cat((features, f1))
@@ -565,4 +568,4 @@ for epoch in range(EPOCH):
         print('epoch [{}/{}], val_mse_loss:{:.4f}'
           .format(epoch, EPOCH, loss2))
 
-torch.save(my_model.state_dict(), './  std2_NNmodel_rtd.pth')
+torch.save(my_model.state_dict(), './  NNmodel_2target_std2.pth')
