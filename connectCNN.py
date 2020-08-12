@@ -377,7 +377,7 @@ for epoch in range(EPOCH):
           .format(epoch, EPOCH, loss1))
         print('epoch [{}/{}], mse_loss:{:.4f}'
           .format(epoch, EPOCH, loss2))
-    writer.close()
+writer.close()
 
 
 torch.save(model.state_dict(), './rtd_cnn_connect.pth')
