@@ -9,9 +9,8 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 from torch.utils.data import Dataset, DataLoader
-import tensorflow as tf    
-import tensorboard as tb   
-tf.io.gfile = tb.compat.tensorflow_stub.io.gfile
+
+from sklearn.metrics import r2_score
 
 ###quantity data
 import pandas as pd
@@ -68,13 +67,13 @@ text_onehot_list = get_onehot_list(classes)
 
 
 columns = ['Rotation_speed','Total_rate','one','two','three','RTD','Temperature']
-train =pd.read_csv('D:/PYTHON/35_data.csv', names=columns)
+train =pd.read_csv('D:/PYTHON/training_data700-1.csv', names=columns)
 #train=train.sample(frac=1)
 train.head()
 train.Temperature=pd.to_numeric(train.Temperature)
 train.RTD=pd.to_numeric(train.RTD)
-
 train2=pd.DataFrame(train, copy=True)
+
 
 #Part4
 ### normalize speed
@@ -125,7 +124,7 @@ train_y = np.concatenate((np.array([train.RTD.values]).transpose(1,0),
 
 #print(train_y.shape)
 # (3140,2)
-def split_dataframe(df, chunk_size = 140): 
+def split_dataframe(df, chunk_size = 400): 
     chunks = list()
     num_chunks = len(df) // chunk_size + 1
     for i in range(num_chunks):
@@ -164,52 +163,13 @@ print(a[0].one.array)
 
 
 
-###CNN model
-class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(AE, self).__init__()
-        self.hidden_size = hidden_size
-        self.input_size = input_size
-        self.output_size = output_size
-        # 压缩
-        self.encoder = nn.Sequential(
-#             nn.Linear(5, 32),
-            nn.Linear(input_size, hidden_size),
-            nn.Tanh(),
-#             nn.Linear(15, 15),
-#             nn.Tanh(),
-#             nn.Linear(15, 15),
-#             nn.Tanh(),
-#            nn.Linear(hidden_size, 1),   # 压缩成3个特征, 进行 3D 图像可视化
-#             nn.Tanh(),
-        )
-        self.encoder2 = nn.Linear(hidden_size, 1)
-
-        # 解压
-        self.decoder = nn.Sequential(
-            nn.Linear(1, hidden_size),
-            nn.Tanh(),
-#             nn.Linear(15, 15),
-#             nn.Tanh(),
-#             nn.Linear(15, 15),
-#             nn.Tanh(),
-            nn.Linear(hidden_size,output_size),
-#             nn.Sigmoid(),       # 激励函数让输出值在 (0, 1)
-        )
-
-    def forward(self, x):
-        feature = self.encoder(x)
-        encoded = self.encoder2(feature)
-        decoded = self.decoder(encoded)
-        return feature, encoded, decoded
-
 ### NN model
 class Extrader(nn.Module):
     def __init__(self):
         super(Extrader, self).__init__()
         # 压缩
         self.model = nn.Sequential(
-            nn.Linear(5, 64),
+            nn.Linear(92, 64),
             nn.Dropout(0.5),
             nn.Tanh(),
             nn.Linear(64, 64),#
@@ -229,24 +189,14 @@ class Extrader(nn.Module):
 class IntegratedModel(nn.Module):
     def __init__(self):
         super(IntegratedModel, self).__init__()
-        self.AE = AE(30,15,30)
+        #self.AE = AE()
         #self.CNNAE.load_state_dict(torch.load('D:/PYTHON/  CNNstd_rtd.pth'))
         self.extrater = Extrader()
         
-    def forward(self, m1,m2,m3, quantity):
-        feature1,encoded_1,decoded_1 = self.AE(m1)
-#         print(encoded_1.shape)
-        feature2,encoded_2,decoded_2 = self.AE(m2)
-        feature3,encoded_3,decoded_3 = self.AE(m3)
-#         print(quantity[0,0].shape)
-        e1=torch.reshape(encoded_1,(-1,1))
-        e2=torch.reshape(encoded_2,(-1,1))
-        e3=torch.reshape(encoded_3,(-1,1))
+    def forward(self, input_value):
 
-        input_value = torch.cat((e1, e2, e3,quantity),1)
-#         print(input_value.shape)
         out = self.extrater(input_value)
-        return e1,e2,e3,decoded_1,decoded_2,decoded_3,out
+        return out
 
 
 
@@ -255,16 +205,20 @@ class IntegratedModel(nn.Module):
 for j in range(100):
 
     model = IntegratedModel()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
-    EPOCH = 101
-    loss_func = nn.MSELoss()
-    writer = SummaryWriter('35_temp_ae_{}/NN_result'.format(j+1))
+    model.load_state_dict(torch.load('D:/PYTHON/10_tempNN_100_{}.pth'.format(j+1)))
 
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
+    EPOCH = 1
+    loss_func = nn.MSELoss()
+    model.eval()
+    #writer = SummaryWriter('tempNN_100_{}/NN_result'.format(j+1))
+    
     for epoch in range(EPOCH):
-        meta_data = [] #存放标签
-        features = torch.zeros(0)  #PCA用
+        '''
+        #meta_data = [] #存放标签
+        #features = torch.zeros(0)  #PCA用
         model.train()
-        for i in range(1):
+        for i in range(7):
             targetR = torch.FloatTensor(a[i].RTD.array).view(-1,1).detach()
             targetT = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
             target= torch.cat([targetR,targetT],axis=1)
@@ -274,88 +228,84 @@ for j in range(100):
     
             q1=torch.FloatTensor(a[i].Rotation_speed.array).view(-1,1)
             q2=torch.FloatTensor(a[i].Total_rate.array).view(-1,1)
+            quality=torch.cat([m1,m2,m3],axis=1)
             quantity=torch.cat([q1,q2],axis=1)
-
+            input_values=torch.cat([quality,quantity],axis=1)
             #input_value = torch.cat((e11, e22, e33,quantity),1)
             #print(input_value.shape)
 
 
-            e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
+            out= model(input_values)
             #e11,e21,e31,d11,d21,d31,out1= model(n1,n2,n3,quantity)
             #e12,e22,e32,d12,d22,d32,out2= model(n11,n21,n31,quantity)
             #e13,e23,e33,d13,d23,d33,out3= model(n12,n22,n32,quantity)
 
-            loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)#+\
-            #loss_func(d11, m1) + loss_func(d21, m2) + loss_func(d31, m3)+\
-            #loss_func(d12, m1) + loss_func(d22, m2) + loss_func(d32, m3)+\
+            #loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)#+
+            #loss_func(d11, m1) + loss_func(d21, m2) + loss_func(d31, m3)+
+            #loss_func(d12, m1) + loss_func(d22, m2) + loss_func(d32, m3)+
             #loss_func(d13, m1) + loss_func(d23, m2) + loss_func(d33, m3)
-            loss2= loss_func(out,target)#+ loss_func(out1,targetT)+ loss_func(out2,targetT)+ loss_func(out3,targetT)
-            loss= 1*loss1+ 1*loss2
+            loss2= loss_func(out,targetT)#+ loss_func(out1,targetT)+ loss_func(out2,targetT)+ loss_func(out3,targetT)
+            loss= loss2
             # apply gradients
 
             optimizer.zero_grad()               # clear gradients for this training step
             loss.backward()                     # backpropagation, compute gradients
             optimizer.step()     
 
-            print('epoch [{}/{}],batch[{}/{}], cnn_loss:{:.4f}, nn_loss:{:.4f}'
-            .format(epoch, EPOCH, i+1 , 2, loss1.item(),loss2.item()))
+            print('epoch [{}/{}],batch[{}/{}],nn_loss:{:.4f}'
+            .format(epoch, EPOCH, i+1 , 8,loss2.item()))
 
-            features = torch.cat((features, e1))
-            features = torch.cat((features, e2))
-            features = torch.cat((features, e3))
-            label1=b[i].one.values.tolist()
-            label2=b[i].two.values.tolist()
-            label3=b[i].three.values.tolist()
-            meta_data = meta_data + label1 +label2 + label3
+
             #print(len(meta_data))
 
-        
+    
 
-        
-
-
-        writer.add_embedding(features, metadata=meta_data, global_step=epoch)
-        writer.add_scalar('AE_loss', loss1, epoch)
-        writer.add_scalar('MSE_loss', loss2, epoch)
+        #writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        #writer.add_scalar('MSE_loss', loss2, epoch)
 
 
+        '''
 
 
-        model.eval()
-
-        targetR = torch.FloatTensor(a[1].RTD.array).view(-1,1).detach()
-        targetT = torch.FloatTensor(a[1].Temperature.array).view(-1,1).detach()
+        targetR = torch.FloatTensor(a[7].RTD.array).view(-1,1).detach()
+        targetT = torch.FloatTensor(a[7].Temperature.array).view(-1,1).detach()
         target= torch.cat([targetR,targetT],axis=1)
 
-        m1 = torch.FloatTensor(a[1].one.array)
-        m2 = torch.FloatTensor(a[1].two.array)
-        m3 = torch.FloatTensor(a[1].three.array)
 
-        q1=torch.FloatTensor(a[1].Rotation_speed.array).view(-1,1)
-        q2=torch.FloatTensor(a[1].Total_rate.array).view(-1,1)
+        target= torch.cat([targetR,targetT],axis=1)
+        m1 = torch.FloatTensor(a[7].one.array)
+        m2 = torch.FloatTensor(a[7].two.array)
+        m3 = torch.FloatTensor(a[7].three.array)
+    
+        q1=torch.FloatTensor(a[7].Rotation_speed.array).view(-1,1)
+        q2=torch.FloatTensor(a[7].Total_rate.array).view(-1,1)
+        quality=torch.cat([m1,m2,m3],axis=1)
         quantity=torch.cat([q1,q2],axis=1)
-
-            #input_value = torch.cat((e11, e22, e33,quantity),1)
-            #print(input_value.shape)
-
-
-        e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
-        loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)
+        input_values=torch.cat([quality,quantity],axis=1)
+        out= model(input_values)
+        '''
+        out0=out[:,0]
+        out0=torch.reshape(out0, (340, 1))
+        out1=out[:,1]
+        out1=torch.reshape(out1, (340, 1))
+        '''
         loss2= loss_func(out,targetT)
 
-        loss= 1*loss1+ 1*loss2
+        loss= loss2
             # apply gradients
 
         optimizer.zero_grad()               # clear gradients for this training step
         loss.backward()                     # backpropagation, compute gradients
         optimizer.step()     
-        print('epoch [{}/{}],batch[{}/{}], val_cnn_loss:{:.4f}, val_nn_loss:{:.4f}'
-            .format(epoch, EPOCH, 2 , 2, loss1.item(),loss2.item()))
+        #print(loss2)
+
+        r2=r2_score(targetT.detach().numpy(), out.detach().numpy())
+        print('r2:',r2)
 
 
-        writer.add_scalar('val_MSE_loss', loss2, epoch)
-    writer.close()
+        #writer.add_scalar('val_MSE_loss', loss2, epoch)
+    #writer.close()
 
-    torch.save(model.state_dict(), './35_temp_ae_{}.pth'.format(j+1))
+    
 #tensorboard --logdir=runs
 #http://localhost:6006/

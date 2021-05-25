@@ -42,13 +42,13 @@ class AddGaussianNoise(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 ###encode list
-path='D:/PYTHON/螺桿單元 - 外插2'
+path='D:/PYTHON/螺桿單元'
 img_data = torchvision.datasets.ImageFolder(path,
                                             transform=transforms.Compose([
                                                 transforms.Scale(32),
                                                 transforms.CenterCrop(28),
                                                 transforms.ToTensor(),
-                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                                 AddGaussianNoise(0., 0.13),
 
                                                 ])
@@ -138,10 +138,10 @@ noise_img_data9 = torchvision.datasets.ImageFolder(path,
 
 
 
-print(img_data.imgs)
+#print(img_data.imgs)
 #print(len(img_data))
 #print(len(data_loader))
-print(img_data.class_to_idx)
+#print(img_data.class_to_idx)
 
 img_loader = torch.utils.data.DataLoader(img_data, batch_size=30, num_workers=0,shuffle=False)
 noise_img_loader1=torch.utils.data.DataLoader(noise_img_data1, batch_size=30, num_workers=0,shuffle=False)
@@ -170,11 +170,11 @@ noise_images9, noise_labels9=next(iter(noise_img_loader9))
 
 classes=[
     'kL1-50-4', 'kL2-50-4', 'kL3-50-4', 'kR1-50-4', 'kR2-50-4', 'kR3-50-4',\
-    'mL1r-50-15', 'mL1t-50-15', 'mL2c-50-15', 'mL2r-50-15',\
+    'mL1c-50-15','mL1r-50-15', 'mL1t-50-15', 'mL2c-50-15', 'mL2r-50-15',\
     'mL2t-50-15', 'mL3c-50-15', 'mL3r-50-15', 'mL3t-50-15', 'mR1c-50-15',\
     'mR1r-50-15', 'mR1t-50-15', 'mR2c-50-15', 'mR2r-50-15', 'mR2t-50-15',\
     'mR3c-50-15', 'mR3r-50-15', 'mR3t-50-15', 'sL1-50-33', 'sL2-50-33',\
-    'sL3-50-33', 'sR2-50-33', 'sR3-50-33'
+    'sL3-50-33', 'sR1-50-33','sR2-50-33', 'sR3-50-33'
 ]
 
 def imshow(img):
@@ -210,7 +210,7 @@ fig = plt.figure(figsize=(25, 30))
 
 for idx in np.arange(28):
     ax = fig.add_subplot(6, 5, idx+1, xticks=[], yticks=[])
-    imshow(noise_images[idx])
+    imshow(noise_images1[idx])
     ax.set_title("{} ".format( classes[labels[idx]]),fontsize=10)
 plt.show()
 
@@ -222,47 +222,47 @@ for item in classes:
 encode_list1={}
 i=0
 for item in classes:
-    encode_list1[item]=noise_images.numpy()[i]
+    encode_list1[item]=noise_images1.numpy()[i]
     i += 1
 encode_list2={}
 i=0
 for item in classes:
-    encode_list2[item]=noise_images.numpy()[i]
+    encode_list2[item]=noise_images2.numpy()[i]
     i += 1
 encode_list3={}
 i=0
 for item in classes:
-    encode_list3[item]=noise_images2.numpy()[i]
+    encode_list3[item]=noise_images3.numpy()[i]
     i += 1
 encode_list4={}
 i=0
 for item in classes:
-    encode_list4[item]=noise_images3.numpy()[i]
+    encode_list4[item]=noise_images4.numpy()[i]
     i += 1
 encode_list5={}
 i=0
 for item in classes:
-    encode_list5[item]=noise_images.numpy()[i]
+    encode_list5[item]=noise_images5.numpy()[i]
     i += 1
 encode_list6={}
 i=0
 for item in classes:
-    encode_list6[item]=noise_images2.numpy()[i]
+    encode_list6[item]=noise_images6.numpy()[i]
     i += 1
 encode_list7={}
 i=0
 for item in classes:
-    encode_list7[item]=noise_images3.numpy()[i]
+    encode_list7[item]=noise_images7.numpy()[i]
     i += 1
 encode_list8={}
 i=0
 for item in classes:
-    encode_list8[item]=noise_images.numpy()[i]
+    encode_list8[item]=noise_images8.numpy()[i]
     i += 1
 encode_list9={}
 i=0
 for item in classes:
-    encode_list9[item]=noise_images2.numpy()[i]
+    encode_list9[item]=noise_images9.numpy()[i]
     i += 1
 
 
@@ -328,7 +328,7 @@ def to_img(x):
 
 
 columns = ['Rotation_speed','Total_rate','one','two','three','RTD','Temperature']
-train =pd.read_csv('D:/PYTHON/2外插_train.csv', names=columns)
+train =pd.read_csv('D:/PYTHON/training_data700-1.csv', names=columns)
 #train=train.sample(frac=1)
 train.head()
 train.Temperature=pd.to_numeric(train.Temperature)
@@ -346,18 +346,18 @@ train10=pd.DataFrame(train, copy=True)
 #Part4
 ### normalize speed
 speed = np.array([train.Rotation_speed.values],dtype = np.float32).transpose(1,0)
-print(speed.shape)
+#print(speed.shape)
 speed_min = min_max_normalize(speed)
-print(speed_min[:4])
+#print(speed_min[:4])
 speed_nor = normalize(speed)
 train.Rotation_speed=speed_nor
 # print(speed_nor[:4])
 
 ### normalize total rate
 Total_rate = np.array([train.Total_rate.values],dtype = np.float32).transpose(1,0)
-print(Total_rate.shape)
+#print(Total_rate.shape)
 Total_rate_min = min_max_normalize(Total_rate)
-print(Total_rate_min[:4])
+#print(Total_rate_min[:4])
 Total_rate_nor = normalize(Total_rate)
 train.Total_rate=Total_rate_nor
 
@@ -581,7 +581,7 @@ model = IntegratedModel()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 EPOCH = 101
 loss_func = nn.MSELoss()
-writer = SummaryWriter('rtd_2外插/NN_result')
+writer = SummaryWriter('temp100_10/NN_result')
 
 for epoch in range(EPOCH):
     meta_data = [] #存放标签
@@ -631,38 +631,38 @@ for epoch in range(EPOCH):
 
 
         e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
-        #e11,e12,e13,d11,d12,d13,out1= model(n11,n12,n13,quantity)
-        #e21,e22,e23,d21,d22,d23,out2= model(n21,n22,n23,quantity)
-        #e31,e32,e33,d31,d32,d33,out3= model(n31,n32,n33,quantity)
-        #e41,e42,e43,d41,d42,d43,out4= model(n41,n42,n43,quantity)
-        #e51,e52,e53,d51,d52,d53,out5= model(n51,n52,n53,quantity)
-        #e61,e62,e63,d61,d62,d63,out6= model(n61,n62,n63,quantity)
-        #e71,e72,e73,d71,d72,d73,out7= model(n71,n72,n73,quantity)
-        #e81,e82,e83,d81,d82,d83,out8= model(n81,n82,n83,quantity)
-        #e91,e92,e93,d91,d92,d93,out9= model(n91,n92,n93,quantity)
+        e11,e12,e13,d11,d12,d13,out1= model(n11,n12,n13,quantity)
+        e21,e22,e23,d21,d22,d23,out2= model(n21,n22,n23,quantity)
+        e31,e32,e33,d31,d32,d33,out3= model(n31,n32,n33,quantity)
+        e41,e42,e43,d41,d42,d43,out4= model(n41,n42,n43,quantity)
+        e51,e52,e53,d51,d52,d53,out5= model(n51,n52,n53,quantity)
+        e61,e62,e63,d61,d62,d63,out6= model(n61,n62,n63,quantity)
+        e71,e72,e73,d71,d72,d73,out7= model(n71,n72,n73,quantity)
+        e81,e82,e83,d81,d82,d83,out8= model(n81,n82,n83,quantity)
+        e91,e92,e93,d91,d92,d93,out9= model(n91,n92,n93,quantity)
 
 
 
 
 
-        loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)#+\
-        #loss_func(d11, m1) + loss_func(d12, m2) + loss_func(d13, m3)+\
-        #loss_func(d21, m1) + loss_func(d22, m2) + loss_func(d23, m3)+\
-        #loss_func(d31, m1) + loss_func(d32, m2) + loss_func(d33, m3)+\
-        #loss_func(d41, m1) + loss_func(d42, m2) + loss_func(d43, m3)+\
-        #loss_func(d51, m1) + loss_func(d52, m2) + loss_func(d53, m3)+\
-        #loss_func(d61, m1) + loss_func(d62, m2) + loss_func(d63, m3)+\
-        #loss_func(d71, m1) + loss_func(d72, m2) + loss_func(d73, m3)+\
-        #loss_func(d81, m1) + loss_func(d82, m2) + loss_func(d83, m3)+\
-        #loss_func(d91, m1) + loss_func(d92, m2) + loss_func(d93, m3)
+        loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)+\
+        loss_func(d11, m1) + loss_func(d12, m2) + loss_func(d13, m3)+\
+        loss_func(d21, m1) + loss_func(d22, m2) + loss_func(d23, m3)+\
+        loss_func(d31, m1) + loss_func(d32, m2) + loss_func(d33, m3)+\
+        loss_func(d41, m1) + loss_func(d42, m2) + loss_func(d43, m3)+\
+        loss_func(d51, m1) + loss_func(d52, m2) + loss_func(d53, m3)+\
+        loss_func(d61, m1) + loss_func(d62, m2) + loss_func(d63, m3)+\
+        loss_func(d71, m1) + loss_func(d72, m2) + loss_func(d73, m3)+\
+        loss_func(d81, m1) + loss_func(d82, m2) + loss_func(d83, m3)+\
+        loss_func(d91, m1) + loss_func(d92, m2) + loss_func(d93, m3)
 
-        loss2= loss_func(out,targetR)#+ loss_func(out1,targetT)+ loss_func(out2,targetT)+ loss_func(out3,targetT)+\
-        #+ loss_func(out4,targetT)+ loss_func(out5,targetT)+ loss_func(out6,targetT)+\
-        #+ loss_func(out7,targetT)+ loss_func(out8,targetT)+ loss_func(out9,targetT)
+        loss2= loss_func(out,targetT)+ loss_func(out1,targetT)+ loss_func(out2,targetT)+ loss_func(out3,targetT)+\
+        loss_func(out4,targetT)+ loss_func(out5,targetT)+ loss_func(out6,targetT)+\
+        loss_func(out7,targetT)+ loss_func(out8,targetT)+ loss_func(out9,targetT)
 
 
         loss= 1*loss1+ 1*loss2
-         # apply gradients
+        # apply gradients
 
         optimizer.zero_grad()               # clear gradients for this training step
         loss.backward()                     # backpropagation, compute gradients
@@ -680,8 +680,8 @@ for epoch in range(EPOCH):
         meta_data = meta_data + label1 +label2 + label3
         #print(len(meta_data))
 
+    '''
     
-
     if epoch % 10 == 0:
         for i in range(1):
             for i, (img, labels) in enumerate(img_loader):
@@ -689,10 +689,9 @@ for epoch in range(EPOCH):
                 feature,encoded,decoded = model.CNNAE(img)
 
             pic = to_img(decoded.data)
-            save_image(pic, './img_外插/image_{}.png'.format(epoch))
-    
-    
-
+            save_image(pic, './img10_外插/image_{}.png'.format(epoch))
+        
+    '''
 
     writer.add_embedding(features, metadata=meta_data, global_step=epoch)
     writer.add_scalar('CNNAE_loss', loss1, epoch)
@@ -700,18 +699,18 @@ for epoch in range(EPOCH):
 
     model.eval()
 
-    targetR = torch.FloatTensor(a[6].RTD.array).view(-1,1).detach()
-    targetT = torch.FloatTensor(a[6].Temperature.array).view(-1,1).detach()
+    targetR = torch.FloatTensor(a[7].RTD.array).view(-1,1).detach()
+    targetT = torch.FloatTensor(a[7].Temperature.array).view(-1,1).detach()
     target= torch.cat([targetR,targetT],axis=1)
 
-    m1 = torch.FloatTensor(a[6].one.array)
-    m2 = torch.FloatTensor(a[6].two.array)
-    m3 = torch.FloatTensor(a[6].three.array)
-    n1 = torch.FloatTensor(c1[6].one.array)
-    n2 = torch.FloatTensor(c1[6].two.array)
-    n3 = torch.FloatTensor(c1[6].three.array)
-    q1=torch.FloatTensor(a[6].Rotation_speed.array).view(-1,1)
-    q2=torch.FloatTensor(a[6].Total_rate.array).view(-1,1)
+    m1 = torch.FloatTensor(a[7].one.array)
+    m2 = torch.FloatTensor(a[7].two.array)
+    m3 = torch.FloatTensor(a[7].three.array)
+    n1 = torch.FloatTensor(c1[7].one.array)
+    n2 = torch.FloatTensor(c1[7].two.array)
+    n3 = torch.FloatTensor(c1[7].three.array)
+    q1=torch.FloatTensor(a[7].Rotation_speed.array).view(-1,1)
+    q2=torch.FloatTensor(a[7].Total_rate.array).view(-1,1)
     quantity=torch.cat([q1,q2],axis=1)
 
         #input_value = torch.cat((e11, e22, e33,quantity),1)
@@ -720,7 +719,7 @@ for epoch in range(EPOCH):
 
     e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
     loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)
-    loss2= loss_func(out,targetR)
+    loss2= loss_func(out,targetT)
 
     loss= 1*loss1+ 1*loss2
          # apply gradients
@@ -735,6 +734,6 @@ for epoch in range(EPOCH):
     writer.add_scalar('val_MSE_loss', loss2, epoch)
 writer.close()
 
-torch.save(model.state_dict(), './rtd_2外插.pth')
+torch.save(model.state_dict(), './temp100_10.pth')
 #tensorboard --logdir=runs
 #http://localhost:6006/

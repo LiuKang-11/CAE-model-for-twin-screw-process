@@ -11,7 +11,6 @@ from torchvision.utils import save_image
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import r2_score
 
-
 ###quantity data
 import pandas as pd
 import numpy as np
@@ -297,127 +296,137 @@ class IntegratedModel(nn.Module):
 
 
 ###Training Process
-model = IntegratedModel()
-model.load_state_dict(torch.load('D:/PYTHON/rtdnoise_2外插.pth'))
+#set a loop for 100 sample
+for j in range(100):
+    model = IntegratedModel()
+    model.load_state_dict(torch.load('D:/PYTHON/外插_rtd100_10_weight/外插_rtd100_10_{}.pth'.format(j+1),map_location='cpu'))
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
-EPOCH = 1
-loss_func = nn.MSELoss()
-writer = SummaryWriter('rtdnoise_2外插test/NN_result')
-model.eval()
-'''
-for epoch in range(1):
-    meta_data = [] #存放标签
-    features = torch.zeros(0)  #PCA用
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
+    EPOCH = 1
+    loss_func = nn.MSELoss()
+    #writer = SummaryWriter('temp10_test3/NN_result')
+    model.eval()
+    '''
+    for epoch in range(1):
+        meta_data = [] #存放标签
+        features = torch.zeros(0)  #PCA用
 
-    for i in range(6):
-        targetR = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
-        targetT = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
+        for i in range(6):
+            targetR = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
+            targetT = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
+            target= torch.cat([targetR,targetT],axis=1)
+            m1 = torch.FloatTensor(a[i].one.array)
+            m2 = torch.FloatTensor(a[i].two.array)
+            m3 = torch.FloatTensor(a[i].three.array)
+            q1=torch.FloatTensor(a[i].Rotation_speed.array).view(-1,1)
+            q2=torch.FloatTensor(a[i].Total_rate.array).view(-1,1)
+            quantity=torch.cat([q1,q2],axis=1)
+
+            #input_value = torch.cat((e11, e22, e33,quantity),1)
+            #print(input_value.shape)
+
+
+            e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
+            loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)
+            loss2= loss_func(out,targetR)
+            loss= 1*loss1+ 1*loss2
+            # apply gradients
+
+            #optimizer.zero_grad()               # clear gradients for this training step
+            #loss.backward()                     # backpropagation, compute gradients
+            #optimizer.step()     
+
+            #print('epoch [{}/{}],batch[{}/{}], cnn_loss:{:.4f}, nn_loss:{:.4f}'
+            #  .format(epoch, EPOCH, i+1 , 7, loss1.item(),loss2.item()))
+
+            features = torch.cat((features, e1))
+            features = torch.cat((features, e2))
+            features = torch.cat((features, e3))
+            label1=b[i].one.values.tolist()
+            label2=b[i].two.values.tolist()
+            label3=b[i].three.values.tolist()
+            meta_data = meta_data + label1 +label2 + label3
+            #print(len(meta_data))
+
+        
+        writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        writer.add_scalar('CNNAE_loss', loss1, epoch)
+        writer.add_scalar('MSE_loss', loss2, epoch)
+
+
+    writer.close()
+    '''
+    #FOR TEST
+
+
+    for epoch in range(1):
+        meta_data = [] #存放标签
+        features = torch.zeros(0)  #PCA用
+
+        targetR = torch.FloatTensor(a[0].RTD.array).view(-1,1).detach()
+        targetT = torch.FloatTensor(a[0].Temperature.array).view(-1,1).detach()
         target= torch.cat([targetR,targetT],axis=1)
-        m1 = torch.FloatTensor(a[i].one.array)
-        m2 = torch.FloatTensor(a[i].two.array)
-        m3 = torch.FloatTensor(a[i].three.array)
-        q1=torch.FloatTensor(a[i].Rotation_speed.array).view(-1,1)
-        q2=torch.FloatTensor(a[i].Total_rate.array).view(-1,1)
+        m1 = torch.FloatTensor(a[0].one.array)
+        m2 = torch.FloatTensor(a[0].two.array)
+        m3 = torch.FloatTensor(a[0].three.array)
+        q1=torch.FloatTensor(a[0].Rotation_speed.array).view(-1,1)
+        q2=torch.FloatTensor(a[0].Total_rate.array).view(-1,1)
         quantity=torch.cat([q1,q2],axis=1)
 
-        #input_value = torch.cat((e11, e22, e33,quantity),1)
-        #print(input_value.shape)
+            #input_value = torch.cat((e11, e22, e33,quantity),1)
+            #print(input_value.shape)
 
 
         e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
         loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)
+        '''
+        out0=out[:,0]
+        out0=torch.reshape(out0, (591, 1))
+        out1=out[:,1]
+        out1=torch.reshape(out1, (591, 1))
+        '''
         loss2= loss_func(out,targetR)
         loss= 1*loss1+ 1*loss2
-         # apply gradients
+            # apply gradients
 
         #optimizer.zero_grad()               # clear gradients for this training step
         #loss.backward()                     # backpropagation, compute gradients
         #optimizer.step()     
 
         #print('epoch [{}/{}],batch[{}/{}], cnn_loss:{:.4f}, nn_loss:{:.4f}'
-        #  .format(epoch, EPOCH, i+1 , 7, loss1.item(),loss2.item()))
+        #      .format(epoch, EPOCH, i+1 , 7, loss1.item(),loss2.item()))
 
         features = torch.cat((features, e1))
         features = torch.cat((features, e2))
         features = torch.cat((features, e3))
-        label1=b[i].one.values.tolist()
-        label2=b[i].two.values.tolist()
-        label3=b[i].three.values.tolist()
+        label1=b[0].one.values.tolist()
+        label2=b[0].two.values.tolist()
+        label3=b[0].three.values.tolist()
         meta_data = meta_data + label1 +label2 + label3
         #print(len(meta_data))
+        #print(loss1)
+        print(loss2)
 
-    
-    writer.add_embedding(features, metadata=meta_data, global_step=epoch)
-    writer.add_scalar('CNNAE_loss', loss1, epoch)
-    writer.add_scalar('MSE_loss', loss2, epoch)
+        r2=r2_score(targetR.detach().numpy(), out.detach().numpy())
+        #print('r2:',r2)
+        '''
+        if epoch % 10 == 0:
+            for i in range(1):
+                for i, (img, labels) in enumerate(img_loader):
+        # ===================forward=====================
+                    feature,encoded,decoded = model.CNNAE(img)
+                    loss3 = loss_func(decoded, img)
 
-
-writer.close()
-'''
-#FOR TEST
-
-
-for epoch in range(1):
-    meta_data = [] #存放标签
-    features = torch.zeros(0)  #PCA用
-
-    targetR = torch.FloatTensor(a[0].RTD.array).view(-1,1).detach()
-    targetT = torch.FloatTensor(a[0].Temperature.array).view(-1,1).detach()
-    target= torch.cat([targetR,targetT],axis=1)
-    m1 = torch.FloatTensor(a[0].one.array)
-    m2 = torch.FloatTensor(a[0].two.array)
-    m3 = torch.FloatTensor(a[0].three.array)
-    q1=torch.FloatTensor(a[0].Rotation_speed.array).view(-1,1)
-    q2=torch.FloatTensor(a[0].Total_rate.array).view(-1,1)
-    quantity=torch.cat([q1,q2],axis=1)
-
-        #input_value = torch.cat((e11, e22, e33,quantity),1)
-        #print(input_value.shape)
+                pic = to_img(decoded.data)
+                save_image(pic, './noiseimg_外插/image_{}.png'.format(7))
+                print('caeloss:',loss3)
+        '''
+        #writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        #writer.add_scalar('CNNAE_loss', loss1, epoch)
+        #writer.add_scalar('MSE_loss', loss2, epoch)
 
 
-    e1,e2,e3,d1,d2,d3,out= model(m1,m2,m3,quantity)
-    loss1 = loss_func(d1, m1) + loss_func(d2, m2) + loss_func(d3, m3)
-    loss2= loss_func(out,targetR)
-    loss= 1*loss1+ 1*loss2
-         # apply gradients
-
-    #optimizer.zero_grad()               # clear gradients for this training step
-    #loss.backward()                     # backpropagation, compute gradients
-    #optimizer.step()     
-
-    #print('epoch [{}/{}],batch[{}/{}], cnn_loss:{:.4f}, nn_loss:{:.4f}'
-    #      .format(epoch, EPOCH, i+1 , 7, loss1.item(),loss2.item()))
-
-    features = torch.cat((features, e1))
-    features = torch.cat((features, e2))
-    features = torch.cat((features, e3))
-    label1=b[0].one.values.tolist()
-    label2=b[0].two.values.tolist()
-    label3=b[0].three.values.tolist()
-    meta_data = meta_data + label1 +label2 + label3
-        #print(len(meta_data))
-    
-    print('test_loss:',loss2/591)
-    r2=r2_score(targetR.detach().numpy(), out.detach().numpy())
-    print('r2:',r2)
-    if epoch % 10 == 0:
-        for i in range(1):
-            for i, (img, labels) in enumerate(img_loader):
-    # ===================forward=====================
-                feature,encoded,decoded = model.CNNAE(img)
-                loss3 = loss_func(decoded, img)
-
-            pic = to_img(decoded.data)
-            save_image(pic, './noiseimg_外插/image_{}.png'.format(4))
-            print('caeloss:',loss3)
-    
-    writer.add_embedding(features, metadata=meta_data, global_step=epoch)
-    writer.add_scalar('CNNAE_loss', loss1, epoch)
-    writer.add_scalar('MSE_loss', loss2, epoch)
-
-
-writer.close()
+    #writer.close()
 
 
 

@@ -66,11 +66,12 @@ text_onehot_list = get_onehot_list(classes)
 
 
 columns = ['Rotation_speed','Total_rate','one','two','three','RTD','Temperature']
-train =pd.read_csv('D:/PYTHON/training_data700-1.csv', names=columns)
+train =pd.read_csv('D:/PYTHON/35_data.csv', names=columns)
 #train=train.sample(frac=1)
 train.head()
 train.Temperature=pd.to_numeric(train.Temperature)
 train.RTD=pd.to_numeric(train.RTD)
+train2=pd.DataFrame(train, copy=True)
 
 
 #Part4
@@ -122,7 +123,7 @@ train_y = np.concatenate((np.array([train.RTD.values]).transpose(1,0),
 
 #print(train_y.shape)
 # (3140,2)
-def split_dataframe(df, chunk_size = 400): 
+def split_dataframe(df, chunk_size= 140): 
     chunks = list()
     num_chunks = len(df) // chunk_size + 1
     for i in range(num_chunks):
@@ -200,19 +201,19 @@ class IntegratedModel(nn.Module):
 
 
 ###Training Process
-for j in range(99):
+for j in range(100):
 
     model = IntegratedModel()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
     EPOCH = 101
     loss_func = nn.MSELoss()
-    writer = SummaryWriter('tempNN_100_{}/NN_result'.format(j+1))
+    writer = SummaryWriter('35_tempNN_100_{}/NN_result'.format(j+1))
 
     for epoch in range(EPOCH):
-        meta_data = [] #存放标签
-        features = torch.zeros(0)  #PCA用
+        #meta_data = [] #存放标签
+        #features = torch.zeros(0)  #PCA用
         model.train()
-        for i in range(6):
+        for i in range(1):
             targetR = torch.FloatTensor(a[i].RTD.array).view(-1,1).detach()
             targetT = torch.FloatTensor(a[i].Temperature.array).view(-1,1).detach()
             target= torch.cat([targetR,targetT],axis=1)
@@ -246,8 +247,8 @@ for j in range(99):
             loss.backward()                     # backpropagation, compute gradients
             optimizer.step()     
 
-            print('epoch [{}/{}],batch[{}/{}], cnn_loss:{:.4f}, nn_loss:{:.4f}'
-            .format(epoch, EPOCH, i+1 , 8, loss1.item(),loss2.item()))
+            print('epoch [{}/{}],batch[{}/{}],nn_loss:{:.4f}'
+            .format(epoch, EPOCH, i+1 , 2,loss2.item()))
 
 
             #print(len(meta_data))
@@ -257,7 +258,7 @@ for j in range(99):
         
 
 
-        writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        #writer.add_embedding(features, metadata=meta_data, global_step=epoch)
         writer.add_scalar('MSE_loss', loss2, epoch)
 
 
@@ -265,21 +266,23 @@ for j in range(99):
 
         model.eval()
 
-        targetR = torch.FloatTensor(a[7].RTD.array).view(-1,1).detach()
-        targetT = torch.FloatTensor(a[7].Temperature.array).view(-1,1).detach()
+        targetR = torch.FloatTensor(a[1].RTD.array).view(-1,1).detach()
+        targetT = torch.FloatTensor(a[1].Temperature.array).view(-1,1).detach()
         target= torch.cat([targetR,targetT],axis=1)
 
 
         target= torch.cat([targetR,targetT],axis=1)
-        m1 = torch.FloatTensor(a[7].one.array)
-        m2 = torch.FloatTensor(a[7].two.array)
-        m3 = torch.FloatTensor(a[7].three.array)
+        m1 = torch.FloatTensor(a[1].one.array)
+        m2 = torch.FloatTensor(a[1].two.array)
+        m3 = torch.FloatTensor(a[1].three.array)
     
-        q1=torch.FloatTensor(a[7].Rotation_speed.array).view(-1,1)
-        q2=torch.FloatTensor(a[7].Total_rate.array).view(-1,1)
+        q1=torch.FloatTensor(a[1].Rotation_speed.array).view(-1,1)
+        q2=torch.FloatTensor(a[1].Total_rate.array).view(-1,1)
         quality=torch.cat([m1,m2,m3],axis=1)
         quantity=torch.cat([q1,q2],axis=1)
         input_values=torch.cat([quality,quantity],axis=1)
+        out= model(input_values)
+
         loss2= loss_func(out,targetT)
 
         loss= loss2
@@ -288,13 +291,13 @@ for j in range(99):
         optimizer.zero_grad()               # clear gradients for this training step
         loss.backward()                     # backpropagation, compute gradients
         optimizer.step()     
-        print('epoch [{}/{}],batch[{}/{}], val_cnn_loss:{:.4f}, val_nn_loss:{:.4f}'
-            .format(epoch, EPOCH, 8 , 8, loss1.item(),loss2.item()))
+        print('epoch [{}/{}],batch[{}/{}],val_nn_loss:{:.4f}'
+            .format(epoch, EPOCH, 2 , 2, loss2.item()))
 
 
         writer.add_scalar('val_MSE_loss', loss2, epoch)
     writer.close()
 
-    torch.save(model.state_dict(), './tempNN_100_{}.pth'.format(j+1))
+    torch.save(model.state_dict(), './35_tempNN_100_{}.pth'.format(j+1))
 #tensorboard --logdir=runs
 #http://localhost:6006/
