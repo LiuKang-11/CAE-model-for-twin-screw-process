@@ -4,6 +4,7 @@ import torchvision
 from torchvision import transforms, utils
 import os
 import torch.optim as optim
+from sklearn.metrics import r2_score
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 from torch.utils.data import Dataset, DataLoader
@@ -127,8 +128,10 @@ def to_img(x):
 
 # ML Parameters
 lr = 1e-3
-epochs = 50
+epochs = 100
 batch_size = 400
+#重複實驗100次
+sample = 100
 
 # Input Dataset
 input_datase_file = 'D:/Python/training_data700-1.csv'
@@ -216,13 +219,22 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Load dataset
 dataset = ExtruderDataset()
     #print(dataset.train_y[1,0])
-# Split training and validation set 70%train 30%test
-train_len = int(0.7*len(dataset))
-valid_len = len(dataset) - train_len
-TrainData, ValidationData = random_split(dataset,[train_len, valid_len])
+# Split training and validation set 70%train 15%valid 15%test
+#train_len = int(0.7*len(dataset))
+#valid_len = int(0.15*len(dataset))
+#test_len  = len(dataset) - train_len - valid_len
+
+train_len = 80
+valid_len = 80
+test_len  = 340
+no_use = len(dataset) - train_len - valid_len - test_len
+TrainData, ValidationData, TestData, _ = random_split(dataset,[train_len, valid_len, test_len, no_use])
 # Load into Iterator (each time get one batch)
 train_loader = data.DataLoader(TrainData, batch_size=batch_size, shuffle=True, num_workers=0)
-test_loader = data.DataLoader(ValidationData, batch_size=batch_size, shuffle=True, num_workers=0)
+valid_loader = data.DataLoader(ValidationData, batch_size=batch_size, shuffle=True, num_workers=0)
+test_loader = data.DataLoader(TestData, batch_size=test_len, shuffle=True, num_workers=0)
+
+
 '''
 print("Total: ", len(dataset))
 print("Training Set: ", len(TrainData))
@@ -290,7 +302,7 @@ class Extrader(nn.Module):
             nn.Linear(64, 64),#
             nn.Dropout(0.5),
             nn.Tanh(),#
-            nn.Linear(64, 1),   # 
+            nn.Linear(64, 2),   #單輸出(64,1) 雙輸出(64,2)
         )
         
     def forward(self, x):
@@ -302,7 +314,6 @@ class IntegratedModel(nn.Module):
     def __init__(self):
         super(IntegratedModel, self).__init__()
         self.CNNAE = CNNAE()
-        #self.CNNAE.load_state_dict(torch.load('D:/PYTHON/  CNNstd_rtd.pth'))
         self.extrater = Extrader()
         
     def forward(self, m1,m2,m3, quantity):
@@ -321,22 +332,14 @@ class IntegratedModel(nn.Module):
         return e1,e2,e3,decoded_1,decoded_2,decoded_3,out
 
 
-# Define model
-model = IntegratedModel()
-    #print(model)
-
-# Load into GPU if necessary
-model = model.to(device)
-
 # Define loss function
 criterion = nn.MSELoss()
 #criterion = nn.MSELoss(reduction='sum')
 
 # Define optimization strategy
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 #optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 #optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=5e-4)
-writer = SummaryWriter('rtd_CNNAE/result')
+
 
 ###########################
 # Train with training set #
@@ -365,12 +368,14 @@ def train(model, iterator, optimizer, criterion, device):
         quantity = x
         # put data into model
         e1,e2,e3,d1,d2,d3,preds= model(m1,m2,m3,quantity)
-        preds = preds.view(-1,1)
+        preds = preds.view(-1,2) #單輸出(-1,1) 雙輸出(-1,2)
         # rtd or temp
-        target = y[:,0].view(-1,1)
+        targetR = y[:,0].view(-1,1)
+        targetT = y[:,1].view(-1,1)
+        target2 = y[:,:].view(-1,2)
         # calculate loss
         loss1 = criterion(d1, m1) + criterion(d2, m2) + criterion(d3, m3)#+\
-        loss2 = criterion(preds, target)
+        loss2 = criterion(preds, target2)
         loss = loss1 + loss2
         # compute gradients and update weights
         loss.backward()
@@ -405,6 +410,8 @@ def test(model, iterator, criterion, device):
     test_loss = 0
     cae_loss = 0
     nn_loss = 0
+    meta_data = [] 
+    features = torch.zeros(0) #save embedding
     for _, (x,one,two,three,y,name1,name2,name3) in enumerate(iterator):
         
         # move to GPU if necessary
@@ -420,12 +427,14 @@ def test(model, iterator, criterion, device):
         quantity = x
         # put data into model
         e1,e2,e3,d1,d2,d3,preds= model(m1,m2,m3,quantity)
-        preds = preds.view(-1,1)
+        preds = preds.view(-1,2) #單or雙
         # rtd or temp
-        target = y[:,0].view(-1,1)
+        targetR = y[:,0].view(-1,1)
+        targetT = y[:,1].view(-1,1)
+        target2 = y[:,:].view(-1,2)
         # calculate loss
         loss1 = criterion(d1, m1) + criterion(d2, m2) + criterion(d3, m3)#+\
-        loss2 = criterion(preds, target)
+        loss2 = criterion(preds, target2)
         loss = loss1 + loss2
         
         # record training losses
@@ -433,44 +442,99 @@ def test(model, iterator, criterion, device):
         nn_loss += loss2.item()
         test_loss += loss.item()
 
+        #embeddinh value
+        features = torch.cat((features, e1))
+        features = torch.cat((features, e2))
+        features = torch.cat((features, e3))
+        label1 = list(name1[:])
+        label2 = list(name2[:])
+        label3 = list(name3[:])
+        meta_data = meta_data + label1 +label2 + label3
     # print completed result
    
-        print('batch[{}/{}], train_cae_loss:{:.4f}, train_nn_loss:{:.4f}'
-          .format(_+1 , 3, loss1.item(),loss2.item()))
-    print('test_cae_loss: %f' % (cae_loss))
-    print('test_nn_loss: %f' % (nn_loss))    
-    print('test_loss: %f' % (test_loss))
-    return cae_loss, nn_loss, test_loss
+        #print('batch[{}/{}], train_cae_loss:{:.4f}, train_nn_loss:{:.4f}'
+        #  .format(_+1 , 3, loss1.item(),loss2.item()))
 
-
-
-
-
+        #單輸出
+        #r2_rtd = r2_score(targetR.detach().numpy(), preds.detach().numpy())
+        #r2_temp = r2_score(targetT.detach().numpy(), preds.detach().numpy())        
+        #雙輸出
+        r2_rtd = r2_score(targetR.detach().numpy(), preds[:,0].detach().numpy())
+        r2_temp = r2_score(targetT.detach().numpy(), preds[:,1].detach().numpy())
+    #print('test_cae_loss: %f' % (cae_loss))
+    #print('test_nn_loss: %f' % (nn_loss))    
+    #print('test_loss: %f' % (test_loss))
+    print('r2_2_rtd: %f' % (r2_rtd))    
+    #print('r2_2_temp: %f' % (r2_temp))
+    return cae_loss, nn_loss, test_loss, features, meta_data
 
 
 
 
 # Running
-for epoch in range(epochs):
-    print("===== Epoch %i =====" % epoch)
-    ###Training Part
-    loss1, loss2, total_loss, features, meta_data = train(model, train_loader, optimizer, criterion, device)
-    # decoder result
-    if epoch % 10 == 0:
-        for i in range(1):
-            for i, (img, labels) in enumerate(img_loader):
-    # ===================forward=====================
-                feature,encoded,decoded = model.CNNAE(img)
+for j in range(sample):
+    # Define model
+    model = IntegratedModel()
+    # use GPU if available
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    writer = SummaryWriter('rtd_cae/rtd_CNNAE_sample{}/result'.format(j+1))
 
-            pic = to_img(decoded.data)
-            save_image(pic, './img_decoder/image_{}.png'.format(epoch))
-    #save embedding value
-    writer.add_embedding(features, metadata=meta_data, global_step=epoch)
-    writer.add_scalar('CNNAE_loss', loss1, epoch)
-    writer.add_scalar('MSE_loss', loss2, epoch)
+    for epoch in range(epochs):
+        print("===== Epoch %i =====" % epoch)
+        ###Training Part
+        loss1, loss2, total_loss, features, meta_data = train(model, train_loader, optimizer, criterion, device)
+        # decoder result
+        if epoch % 10 == 0:
+            for i in range(1):
+                for i, (img, labels) in enumerate(img_loader):
+        # ===================forward=====================
+                    feature,encoded,decoded = model.CNNAE(img)
 
-    ###Test Part
-    test(model, test_loader, criterion, device)
+                pic = to_img(decoded.data)
+                save_image(pic, './img_decoder/image_{}.png'.format(epoch))
+        #save embedding value
+        writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        writer.add_scalar('CNNAE_loss', loss1, epoch)
+        writer.add_scalar('MSE_loss', loss2, epoch)
+
+        ###Validation Part
+        test(model, valid_loader, criterion, device)
+    torch.save(model.state_dict(), './save_model/save_model_sample{}.pth'.format(j+1))
+writer.close()
+
+
+'''
+### Testing 
+for j in range(sample):
+    model = IntegratedModel()
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    model.load_state_dict(torch.load('D:/Python/save_model/save_model_sample{}.pth'.format(j+1)))
+    writer = SummaryWriter('rtd_cae_test/rtd_CNNAE_test_sample{}/result'.format(j+1))
+
+    for epoch in range(1):
+        ###Test Part
+        loss1, loss2, total_loss, features, meta_data = test(model, test_loader, criterion, device)
+
+        # decoder result
+        if epoch % 1 == 0:
+            for i in range(1):
+                for i, (img, labels) in enumerate(img_loader):
+        # ===================forward=====================
+                    feature,encoded,decoded = model.CNNAE(img)
+
+                pic = to_img(decoded.data)
+                save_image(pic, './img_decoder_test/image_{}.png'.format(epoch))
+
+        #save embedding value
+        writer.add_embedding(features, metadata=meta_data, global_step=epoch)
+        writer.add_scalar('CNNAE_loss', loss1, epoch)
+        writer.add_scalar('MSE_loss', loss2, epoch)
+
+writer.close()
+
+'''
 
 
 #tensorboard --logdir=runs
