@@ -128,13 +128,13 @@ def to_img(x):
 
 # ML Parameters
 lr = 1e-3
-epochs = 100
+epochs = 101
 batch_size = 400
 #重複實驗100次
 sample = 100
 
 # Input Dataset
-input_datase_file = 'D:/Python/training_data700-1.csv'
+input_datase_file = 'D:/python/2外插_train.csv'
 
 # Normalization
 scaler = MinMaxScaler(feature_range=(-1, 1))
@@ -215,7 +215,7 @@ class ExtruderDataset(data.Dataset):
         return x,one,two,three,y,name1,name2,name3
         #return x (speed rate) img(one two three) y(rtd temp)
 device = 'cuda' if torch.cuda.is_available() else 'cpu' 
-
+#device = 'cpu'
 # Load dataset
 dataset = ExtruderDataset()
     #print(dataset.train_y[1,0])
@@ -223,10 +223,10 @@ dataset = ExtruderDataset()
 #train_len = int(0.7*len(dataset))
 #valid_len = int(0.15*len(dataset))
 #test_len  = len(dataset) - train_len - valid_len
-
+'''
 train_len = 80
-valid_len = 80
-test_len  = 340
+valid_len = 47
+test_len  = 300
 no_use = len(dataset) - train_len - valid_len - test_len
 TrainData, ValidationData, TestData, _ = random_split(dataset,[train_len, valid_len, test_len, no_use])
 # Load into Iterator (each time get one batch)
@@ -235,7 +235,7 @@ valid_loader = data.DataLoader(ValidationData, batch_size=batch_size, shuffle=Tr
 test_loader = data.DataLoader(TestData, batch_size=test_len, shuffle=True, num_workers=0)
 
 
-'''
+
 print("Total: ", len(dataset))
 print("Training Set: ", len(TrainData))
 print("Validation Set: ", len(ValidationData))
@@ -353,6 +353,7 @@ def train(model, iterator, optimizer, criterion, device):
     nn_loss = 0
     meta_data = [] 
     features = torch.zeros(0) #save embedding
+    features = features.to(device)
     for _, (x,one,two,three,y,name1,name2,name3) in enumerate(iterator):
         
         # move to GPU if necessary
@@ -372,7 +373,7 @@ def train(model, iterator, optimizer, criterion, device):
         # rtd or temp
         targetR = y[:,0].view(-1,1)
         targetT = y[:,1].view(-1,1)
-        target2 = y[:,:].view(-1,2)
+        target2 = y[:,:].view(-1,2) 
         # calculate loss
         loss1 = criterion(d1, m1) + criterion(d2, m2) + criterion(d3, m3)#+\
         loss2 = criterion(preds, target2)
@@ -380,12 +381,10 @@ def train(model, iterator, optimizer, criterion, device):
         # compute gradients and update weights
         loss.backward()
         optimizer.step()
-        
         # record training losses
         cae_loss += loss1.item()
         nn_loss += loss2.item()
         train_loss += loss.item()
-
         # save embedding value
         features = torch.cat((features, e1))
         features = torch.cat((features, e2))
@@ -393,11 +392,11 @@ def train(model, iterator, optimizer, criterion, device):
         label1 = list(name1[:])
         label2 = list(name2[:])
         label3 = list(name3[:])
-        meta_data = meta_data + label1 +label2 + label3
+        meta_data = meta_data + label1 +label2 + label3        
     # print completed result
    
         print('batch[{}/{}], train_cae_loss:{:.4f}, train_nn_loss:{:.4f}'
-          .format(_+1 , 6, loss1.item(),loss2.item()))
+          .format(_+1 , (train_len//batch_size)+1, loss1.item(),loss2.item()))
     print('train_cae_loss: %f' % (cae_loss))
     print('train_nn_loss: %f' % (nn_loss))    
     print('train_loss: %f' % (train_loss))
@@ -411,7 +410,8 @@ def test(model, iterator, criterion, device):
     cae_loss = 0
     nn_loss = 0
     meta_data = [] 
-    features = torch.zeros(0) #save embedding
+    features = torch.zeros(0)
+    features = features.to(device) #save embedding
     for _, (x,one,two,three,y,name1,name2,name3) in enumerate(iterator):
         
         # move to GPU if necessary
@@ -456,11 +456,11 @@ def test(model, iterator, criterion, device):
         #  .format(_+1 , 3, loss1.item(),loss2.item()))
 
         #單輸出
-        #r2_rtd = r2_score(targetR.detach().numpy(), preds.detach().numpy())
-        #r2_temp = r2_score(targetT.detach().numpy(), preds.detach().numpy())        
+        #r2_rtd = r2_score(targetR.detach().cpu().numpy(), preds.cpu().detach().numpy())
+        #r2_temp = r2_score(targetT.detach().cpu().numpy(), preds.cpu().detach().numpy())        
         #雙輸出
-        r2_rtd = r2_score(targetR.detach().numpy(), preds[:,0].detach().numpy())
-        r2_temp = r2_score(targetT.detach().numpy(), preds[:,1].detach().numpy())
+        r2_rtd = r2_score(targetR.cpu().detach().numpy(), preds[:,0].cpu().detach().numpy())
+        #r2_temp = r2_score(targetT.cpu().detach().numpy(), preds[:,1].cpu().detach().numpy())
     #print('test_cae_loss: %f' % (cae_loss))
     #print('test_nn_loss: %f' % (nn_loss))    
     #print('test_loss: %f' % (test_loss))
@@ -473,12 +473,21 @@ def test(model, iterator, criterion, device):
 
 # Running
 for j in range(sample):
+    train_len = 2400
+    valid_len = 50
+    test_len  = 50
+    no_use = len(dataset) - train_len - valid_len - test_len
+    TrainData, ValidationData, TestData, _ = random_split(dataset,[train_len, valid_len, test_len, no_use])
+    # Load into Iterator (each time get one batch)
+    train_loader = data.DataLoader(TrainData, batch_size=batch_size, shuffle=True, num_workers=0)
+    valid_loader = data.DataLoader(ValidationData, batch_size=batch_size, shuffle=True, num_workers=0)
+    test_loader = data.DataLoader(TestData, batch_size=test_len, shuffle=True, num_workers=0)
     # Define model
     model = IntegratedModel()
     # use GPU if available
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    writer = SummaryWriter('rtd_cae/rtd_CNNAE_sample{}/result'.format(j+1))
+    writer = SummaryWriter('rtd_cae29700S2/2T_CNNAE_sample{}/result'.format(j+1))
 
     for epoch in range(epochs):
         print("===== Epoch %i =====" % epoch)
@@ -489,6 +498,7 @@ for j in range(sample):
             for i in range(1):
                 for i, (img, labels) in enumerate(img_loader):
         # ===================forward=====================
+                    img, labels = img.to(device), labels.to(device)
                     feature,encoded,decoded = model.CNNAE(img)
 
                 pic = to_img(decoded.data)
@@ -500,7 +510,7 @@ for j in range(sample):
 
         ###Validation Part
         test(model, valid_loader, criterion, device)
-    torch.save(model.state_dict(), './save_model/save_model_sample{}.pth'.format(j+1))
+    torch.save(model.state_dict(), './save_model29700S/save_model_sample{}.pth'.format(j+1))
 writer.close()
 
 
@@ -522,6 +532,7 @@ for j in range(sample):
             for i in range(1):
                 for i, (img, labels) in enumerate(img_loader):
         # ===================forward=====================
+                    img, labels = img.to(device), labels.to(device)
                     feature,encoded,decoded = model.CNNAE(img)
 
                 pic = to_img(decoded.data)
