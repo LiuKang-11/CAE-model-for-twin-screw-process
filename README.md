@@ -1,5 +1,5 @@
 # CAE(CNN Autoencoder) Model for TSE (Twin screw extruder) process
-My master degree
+
 Model Architecture
 ![image](https://user-images.githubusercontent.com/13636671/128841487-128e2580-7fa1-4dd5-9273-99b901ac9766.png)
 
