@@ -47,7 +47,7 @@ class AddGaussianNoise(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 ###encode list
-path='D:/Python/螺桿單元'
+path='../extruder_element'
 img_data = torchvision.datasets.ImageFolder(path,
                                             transform=transforms.Compose([
                                                 transforms.Scale(32),

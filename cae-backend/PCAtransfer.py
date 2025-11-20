@@ -67,7 +67,7 @@ classes=[
 
 colors=['pink','pink','pink','red','red','red','black','grey','grey','grey',\
 'grey','grey','grey','grey','grey','grey','grey','grey','grey','grey',\
-'grey','grey','grey','grey','aquamarine','aquamarine','aquamarine','purple','blue','blue']
+'grey','grey','grey','grey','aquamarine','aquamarine','aquamarine','blue','blue','blue']
 colors2=['pink','pink','pink','red','red','red','grey','grey','grey','grey',\
 'grey','grey','grey','grey','grey','grey','grey','grey','grey','grey',\
 'grey','grey','grey','grey','aquamarine','aquamarine','aquamarine','purple','blue','blue']
